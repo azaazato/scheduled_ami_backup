@@ -5,7 +5,7 @@ import boto3
 from datetime import datetime
 import time
 
-DEFAULT_BACKUP_GENERATION = 70
+DEFAULT_BACKUP_GENERATION = 7
 
 
 def ami_back_up(ec2, client, instance_id):
