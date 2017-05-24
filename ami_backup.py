@@ -1,9 +1,8 @@
 from __future__ import print_function
 
-import json
 import boto3
+import distutils.util
 from datetime import datetime
-import time
 
 DEFAULT_BACKUP_GENERATION = 7
 
@@ -13,9 +12,9 @@ def ami_back_up(ec2, client, instance_id):
     instance_name, image_name = make_name(instance)
     print('create image {}'.format(image_name))
     image = instance.create_image(
-            Name=image_name,
-            NoReboot=True
-            )
+        Name=image_name,
+        NoReboot=no_reboot(instance)
+    )
     set_tags_to_image(ec2, image, instance_name)
 
     sorted_images = sort_images_by_createtime(client, instance_name)
@@ -26,13 +25,13 @@ def ami_back_up(ec2, client, instance_id):
 
 def listup_backup_instances(client):
     response = client.describe_instances(
-            Filters=[
-                {
-                    'Name': 'tag-key',
-                    'Values': ['BACKUP_GENERATION']
-                    }
-                ]
-            )
+        Filters=[
+            {
+                'Name': 'tag-key',
+                'Values': ['BACKUP_GENERATION']
+            }
+        ]
+    )
     instance_ids = []
     instances = response['Reservations']
     for instance in instances:
@@ -44,6 +43,17 @@ def make_name(instance):
     for tag in instance.tags:
         if tag['Key'] == 'Name':
             return tag['Value'], tag['Value'] + '-' + get_time_now()
+
+
+def no_reboot(instance):
+    for tag in instance.tags:
+        if tag['Key'] == 'BACKUP_NO_REBOOT':
+            if tag['Value'] in ('True', 'False'):
+                return True if distutils.util.strtobool(tag['Value']) else False
+            else:
+                print('[WARN]: BACKUP_NO_REBOOT tag is invalid')
+                return True
+    return True
 
 
 def get_backup_generation(instance):
@@ -63,40 +73,41 @@ def delete_old_images(client, images):
         response = client.deregister_image(
             DryRun=False,
             ImageId=image['ImageId']
-            )
+        )
 
 
 def set_tags_to_image(ec2, image, name):
     image.create_tags(
-            Tags=[
-                {
-                    'Key': 'Name',
-                    'Value': name
-                },
-                {
-                    'Key': 'CreateTime',
-                    'Value': get_time_now()
-                }
-                ]
-            )
+        Tags=[
+            {
+                'Key': 'Name',
+                'Value': name
+            },
+            {
+                'Key': 'CreateTime',
+                'Value': get_time_now()
+            }
+        ]
+    )
 
 
 def sort_images_by_createtime(client, name):
     response = client.describe_images(
-            Filters=[
-                {
-                    'Name': 'tag:Name',
-                    'Values': [name]}
-                ]
-            )
+        Filters=[
+            {
+                'Name': 'tag:Name',
+                'Values': [name]}
+        ]
+    )
 
     images = response['Images']
     sorted_images = sorted(
-            images,
-            key = lambda x: x['CreationDate'],
-            reverse = True
-            )
+        images,
+        key=lambda x: x['CreationDate'],
+        reverse=True
+    )
     return sorted_images
+
 
 def lambda_handler(event, context):
     client = boto3.client('ec2')
