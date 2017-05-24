@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import boto3
+import distutils.util
 from datetime import datetime
 
 DEFAULT_BACKUP_GENERATION = 7
@@ -12,7 +13,7 @@ def ami_back_up(ec2, client, instance_id):
     print('create image {}'.format(image_name))
     image = instance.create_image(
         Name=image_name,
-        NoReboot=True
+        NoReboot=no_reboot(instance)
     )
     set_tags_to_image(ec2, image, instance_name)
 
@@ -42,6 +43,17 @@ def make_name(instance):
     for tag in instance.tags:
         if tag['Key'] == 'Name':
             return tag['Value'], tag['Value'] + '-' + get_time_now()
+
+
+def no_reboot(instance):
+    for tag in instance.tags:
+        if tag['Key'] == 'BACKUP_NO_REBOOT':
+            if tag['Value'] in ('True', 'False'):
+                return True if distutils.util.strtobool(tag['Value']) else False
+            else:
+                print('[WARN]: BACKUP_NO_REBOOT tag is invalid')
+                return True
+    return True
 
 
 def get_backup_generation(instance):
