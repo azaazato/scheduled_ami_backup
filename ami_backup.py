@@ -1,9 +1,7 @@
 from __future__ import print_function
 
-import json
 import boto3
 from datetime import datetime
-import time
 
 DEFAULT_BACKUP_GENERATION = 7
 
@@ -13,9 +11,9 @@ def ami_back_up(ec2, client, instance_id):
     instance_name, image_name = make_name(instance)
     print('create image {}'.format(image_name))
     image = instance.create_image(
-            Name=image_name,
-            NoReboot=True
-            )
+        Name=image_name,
+        NoReboot=True
+    )
     set_tags_to_image(ec2, image, instance_name)
 
     sorted_images = sort_images_by_createtime(client, instance_name)
@@ -26,13 +24,13 @@ def ami_back_up(ec2, client, instance_id):
 
 def listup_backup_instances(client):
     response = client.describe_instances(
-            Filters=[
-                {
-                    'Name': 'tag-key',
-                    'Values': ['BACKUP_GENERATION']
-                    }
-                ]
-            )
+        Filters=[
+            {
+                'Name': 'tag-key',
+                'Values': ['BACKUP_GENERATION']
+            }
+        ]
+    )
     instance_ids = []
     instances = response['Reservations']
     for instance in instances:
@@ -63,40 +61,41 @@ def delete_old_images(client, images):
         response = client.deregister_image(
             DryRun=False,
             ImageId=image['ImageId']
-            )
+        )
 
 
 def set_tags_to_image(ec2, image, name):
     image.create_tags(
-            Tags=[
-                {
-                    'Key': 'Name',
-                    'Value': name
-                },
-                {
-                    'Key': 'CreateTime',
-                    'Value': get_time_now()
-                }
-                ]
-            )
+        Tags=[
+            {
+                'Key': 'Name',
+                'Value': name
+            },
+            {
+                'Key': 'CreateTime',
+                'Value': get_time_now()
+            }
+        ]
+    )
 
 
 def sort_images_by_createtime(client, name):
     response = client.describe_images(
-            Filters=[
-                {
-                    'Name': 'tag:Name',
-                    'Values': [name]}
-                ]
-            )
+        Filters=[
+            {
+                'Name': 'tag:Name',
+                'Values': [name]}
+        ]
+    )
 
     images = response['Images']
     sorted_images = sorted(
-            images,
-            key = lambda x: x['CreationDate'],
-            reverse = True
-            )
+        images,
+        key=lambda x: x['CreationDate'],
+        reverse=True
+    )
     return sorted_images
+
 
 def lambda_handler(event, context):
     client = boto3.client('ec2')
